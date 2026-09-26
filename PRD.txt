@@ -1,0 +1,496 @@
+# Project Requirements
+
+## Find My First Open Source Contribution
+
+### 1. Project Overview
+
+**Find My First Open Source Contribution** is an AI-powered web application that helps beginners find suitable GitHub repositories and open issues to make their first open-source contribution.
+
+The system uses **LangGraph** to coordinate multiple specialized agents. Each agent performs one part of the process, and a manager/orchestrator controls the overall workflow.
+
+The main goal is not just to find a `good first issue`, but to determine:
+
+> **"Is this repository and this particular issue actually suitable for me?"**
+
+---
+
+# 2. Problem Statement
+
+Beginners often struggle with open-source contribution because:
+
+* There are thousands of GitHub repositories.
+* Popular repositories may not be actively maintained.
+* `good first issue` does not always mean easy.
+* Beginners may not understand the project's codebase.
+* Contribution guidelines can be difficult to understand.
+* They don't know whether an issue fits their current skills and available time.
+
+The system should reduce this manual research by automatically analyzing repositories and issues and producing a personalized recommendation.
+
+---
+
+# 3. User Input Requirements
+
+The system should collect the following information:
+
+| Input                  | Example         |
+| ---------------------- | --------------- |
+| Programming languages  | Python          |
+| Skills                 | Pandas, NumPy   |
+| Area of interest       | Data / ML       |
+| Experience level       | Beginner        |
+| Available time         | 5 hours/week    |
+| Preferred contribution | Code            |
+| Optional keywords      | Data processing |
+
+Example:
+
+> **Python developer, comfortable with Pandas, interested in Data/ML, beginner in open source, 5 hours/week.**
+
+---
+
+# 4. LangGraph-Based System Requirements
+
+The application should implement the workflow using **LangGraph**.
+
+LangGraph will manage:
+
+* Agent execution
+* State passing between agents
+* Conditional routing
+* Loops/retries
+* Agent results
+* Final recommendation generation
+
+### Proposed LangGraph State
+
+A shared state should contain information such as:
+
+```text
+User Profile
+      ↓
+Repository Candidates
+      ↓
+Repository Health Results
+      ↓
+Suitable Repositories
+      ↓
+Issue Candidates
+      ↓
+Issue Matching Results
+      ↓
+Selected Issue
+      ↓
+Onboarding Guide
+```
+
+---
+
+# 5. Agents / Nodes
+
+## Agent 1 — Discovery Agent
+
+### Responsibility
+
+Find potentially relevant GitHub repositories based on the user's profile.
+
+### Requirements
+
+The agent should:
+
+* Search GitHub using the GitHub API.
+* Consider programming language.
+* Consider topics/keywords.
+* Consider repository activity.
+* Collect candidate repositories.
+* Remove obvious duplicates or irrelevant repositories.
+
+### Output
+
+For example:
+
+```text
+15 candidate repositories
+```
+
+Each candidate should contain information such as:
+
+```text
+Repository
+Language
+Description
+Stars
+Forks
+Open Issues
+Last Updated
+URL
+```
+
+---
+
+# 6. Agent 2 — Repository Health Agent
+
+### Responsibility
+
+Determine whether candidate repositories are actually active and suitable for contribution.
+
+The agent should investigate:
+
+* Recent commits
+* Recent issues
+* Recent pull requests
+* Maintainer activity
+* Issue responses
+* Open issues
+* Contribution guidelines
+* Beginner-friendly labels
+
+### Output
+
+Each repository should receive a structured health assessment.
+
+For example:
+
+```text
+Repository: example/project
+
+Activity: Active
+Maintainer Response: Good
+Good First Issues: Available
+Contribution Guide: Available
+
+Health: Suitable
+```
+
+The system should **not rely only on GitHub stars**.
+
+---
+
+# 7. Agent 3 — Issue Matching Agent
+
+### Responsibility
+
+Find specific issues that match the user's skills and experience.
+
+The agent should analyze:
+
+* Issue title
+* Issue description
+* Labels
+* Required technologies
+* Complexity
+* Expected work
+* Dependencies
+* User skills
+* User experience level
+* Available weekly time
+
+The LLM should reason about whether an issue is realistically suitable.
+
+For example:
+
+```text
+Issue: Improve Pandas data validation
+
+Skill Match: High
+Difficulty: Beginner–Intermediate
+Estimated Effort: Low–Medium
+
+Reason:
+The issue primarily requires Python and Pandas,
+which matches the user's stated skills.
+```
+
+---
+
+# 8. Agent 4 — Onboarding Agent
+
+### Responsibility
+
+Help the user understand **how to actually start working on the selected issue**.
+
+For the selected issue, the agent should retrieve and analyze:
+
+* `README.md`
+* `CONTRIBUTING.md`
+* Relevant documentation
+* Issue discussion
+* Similar merged pull requests
+* Relevant repository files
+
+It should generate:
+
+### Contribution Brief
+
+```text
+1. What the issue is asking
+2. Why it matches you
+3. What you need to learn
+4. Relevant files
+5. How the repository is structured
+6. Similar previous PRs
+7. Suggested implementation steps
+8. Suggested message to maintainer
+```
+
+---
+
+# 9. Agent 5 — Manager / Orchestrator
+
+This is where **LangGraph becomes particularly useful**.
+
+The Manager should control the workflow rather than simply running every agent once.
+
+### Example
+
+```text
+Discovery
+   ↓
+15 repositories
+   ↓
+Health Analysis
+   ↓
+Only 3 healthy repositories
+   ↓
+Issue Matching
+   ↓
+No suitable issues
+   ↓
+Manager evaluates result
+   ↓
+Expand search
+   ↓
+Search related Python/Data repositories
+   ↓
+Issue Matching again
+```
+
+The Manager should decide whether the workflow:
+
+* Continues
+* Loops back
+* Expands the search
+* Stops
+* Produces the final recommendation
+
+---
+
+# 10. LangGraph Workflow
+
+A simplified graph could look like this:
+
+```text
+                  ┌──────────────────┐
+                  │   User Profile   │
+                  └────────┬─────────┘
+                           ↓
+                  ┌──────────────────┐
+                  │ Discovery Agent  │
+                  └────────┬─────────┘
+                           ↓
+                  ┌──────────────────┐
+                  │ Repo Health Agent│
+                  └────────┬─────────┘
+                           ↓
+                    Healthy Repos?
+                      ↙           ↘
+                    Yes            No
+                     ↓              ↓
+              Issue Matching     Manager
+                     ↓              ↓
+              Suitable Issues?   Expand Search
+                  ↙     ↘            │
+                Yes      No ─────────┘
+                 ↓
+          Onboarding Agent
+                 ↓
+          Final Recommendation
+```
+
+---
+
+# 11. Conditional Routing Requirements
+
+LangGraph should use conditional edges for decisions such as:
+
+### Condition 1
+
+```text
+Are enough healthy repositories available?
+```
+
+If **yes → Issue Matching**
+
+If **no → Discovery/Search Expansion**
+
+### Condition 2
+
+```text
+Are suitable issues available?
+```
+
+If **yes → Onboarding**
+
+If **no → Manager**
+
+### Condition 3
+
+```text
+Has the search already been expanded?
+```
+
+If **no → Expand search**
+
+If **yes → Ask user to broaden preferences**
+
+This makes the system genuinely **agentic**, rather than simply having several LLM calls in sequence.
+
+---
+
+# 12. Final Recommendation
+
+The application should present approximately **3–5 recommended issues**.
+
+For each issue:
+
+```text
+─────────────────────────────
+Issue: Add CSV export support
+
+Repository:
+example/project
+
+Why it matches:
+✓ Python
+✓ Data-related
+✓ Beginner-friendly
+✓ Active repository
+
+Difficulty:
+Beginner
+
+Estimated effort:
+2–4 hours
+
+Why:
+The issue requires Python and basic
+data processing knowledge.
+
+[View Issue]
+[Prepare Me]
+─────────────────────────────
+```
+
+The user can then select an issue and generate the detailed onboarding guide.
+
+---
+
+# 13. Technology Requirements
+
+### Frontend
+
+* React
+* Vite
+* Simple UI
+* Tailwind CSS or another lightweight styling solution
+
+### Backend
+
+* Python
+* FastAPI
+
+### Agent Framework
+
+* **LangGraph**
+* LangChain where useful
+
+### AI Model
+
+An LLM API such as:
+
+* Groq
+
+### External API
+
+* **GitHub REST API**
+* GitHub GraphQL API can be considered later if needed.
+
+### Database
+
+For the MVP, a database is **optional**.
+
+If persistence is required:
+
+* PostgreSQL
+
+---
+
+# 14. Functional Requirements
+
+### FR1 — User Profile
+
+The system shall allow users to provide their skills, interests, experience and available time.
+
+### FR2 — GitHub Search
+
+The system shall search GitHub repositories using the provided requirements.
+
+### FR3 — Repository Analysis
+
+The system shall analyze repository activity and contribution characteristics.
+
+### FR4 — Issue Analysis
+
+The system shall analyze open issues and determine their suitability for the user.
+
+### FR5 — Personalized Matching
+
+The system shall match issues against the user's skills and constraints.
+
+### FR6 — Explanation
+
+The system shall explain why each recommended issue is suitable.
+
+### FR7 — Onboarding
+
+The system shall generate a contribution preparation guide for a selected issue.
+
+### FR8 — Adaptive Workflow
+
+The system shall expand or modify its search when suitable results cannot be found.
+
+### FR9 — LangGraph Orchestration
+
+The system shall use LangGraph to manage agent state, workflow transitions and conditional execution.
+
+### FR10 — Error Handling
+
+The system shall handle GitHub API failures, rate limits, unavailable repositories and missing information.
+
+---
+
+# 15. MVP Scope
+
+I would **strongly recommend keeping the first version to these components**:
+
+```text
+User Input
+    ↓
+Discovery Agent
+    ↓
+Repository Health Agent
+    ↓
+Issue Matching Agent
+    ↓
+Onboarding Agent
+    ↓
+Final Recommendation
+```
+
+The **Manager Agent + search loop** can then be added as the main advanced feature.
+
+This gives you a clear progression:
+
+**Basic workflow → Multi-agent workflow → Conditional LangGraph workflow → Adaptive agentic system**
+
+That is much easier to demonstrate in a project presentation because you can clearly show **why LangGraph is being used**, rather than using LangGraph just as a wrapper around a few LLM calls.

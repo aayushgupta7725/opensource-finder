@@ -1,0 +1,108 @@
+## Technical Requirements
+
+### 1. Frontend
+
+* **React + Vite** for the web interface.
+* Simple form for entering:
+
+  * Programming languages
+  * Skills
+  * Area of interest
+  * Experience level
+  * Available time
+* Dashboard to display recommended repositories and issues.
+* Page/section for the generated contribution guide.
+
+### 2. Backend
+
+* **Python + FastAPI** for backend APIs.
+* Handle user requests and communicate with the LangGraph workflow.
+* Manage GitHub API requests and AI model requests.
+
+### 3. Agent Framework
+
+* **LangGraph** for building and managing the multi-agent workflow.
+* **LangChain** for LLM integration and tools where required.
+* Shared state will be used to pass information between agents.
+
+### 4. AI Model
+
+* Use an LLM such as **Groq**.
+* The LLM will be used for:
+
+  * Understanding user requirements
+  * Analyzing repository information
+  * Understanding GitHub issues
+  * Matching issues with user skills
+  * Generating explanations and onboarding guides
+
+### 5. GitHub Integration
+
+* Use the **GitHub REST API** to retrieve:
+
+  * Repositories
+  * Issues
+  * Pull requests
+  * Commits
+  * Repository information
+  * Contribution files such as `README.md` and `CONTRIBUTING.md`
+
+### 6. Database
+
+For the initial version, a database is **optional**.
+
+If required, use:
+
+* **PostgreSQL**
+
+It can store user profiles, search history, and previous recommendations.
+
+### 7. LangGraph Workflow
+
+The main workflow will contain:
+
+```text
+User Input
+    ↓
+Discovery Agent
+    ↓
+Repository Health Agent
+    ↓
+Issue Matching Agent
+    ↓
+Onboarding Agent
+    ↓
+Final Recommendation
+```
+
+A **Manager/Router node** will control the workflow and decide whether the system should repeat or expand the search when suitable results are not found.
+
+### 8. Development & Deployment
+
+* **Git + GitHub** for version control.
+* **VS Code** for development.
+* Backend can be deployed using services such as Render/Railway.
+* Frontend can be deployed using Vercel/Netlify.
+
+### 9. Basic Security Requirements
+
+* Store API keys and LLM credentials in **environment variables**.
+* Do not expose API keys in the frontend.
+* Handle GitHub API rate limits and API errors.
+* Validate user inputs before sending them to the agents.
+
+### Simple Technology Stack
+
+| Component       | Technology               |
+| --------------- | ------------------------ |
+| Frontend        | React + Vite             |
+| Backend         | Python + FastAPI         |
+| Agent Framework | LangGraph                |
+| LLM Framework   | LangChain                |
+| AI Model        | Groq                     |
+| External API    | GitHub API               |
+| Database        | PostgreSQL (Optional)    |
+| Version Control | Git + GitHub             |
+| Deployment      | Vercel + Render/Railway  |
+
+**For the MVP, you can keep it even simpler:** React + FastAPI + LangGraph + one LLM + GitHub API, with no database initially.

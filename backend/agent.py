@@ -354,7 +354,7 @@ def issue_matching_agent(state: AgentState) -> dict:
         for i, iss in enumerate(all_issues[:12])
     )
 
-    prompt = f"""You are an expert open-source contribution advisor.
+    prompt = f"""You are an expert open-source contribution advisor scoring GitHub issues for a specific developer.
 
 User profile:
 - Languages: {profile.get('languages')}
@@ -366,43 +366,140 @@ User profile:
 Open issues to evaluate:
 {issues_summary}
 
-Score every issue and return ONLY a valid JSON array (no markdown, no extra text):
+Score EACH issue individually based on how well it fits THIS specific user. Scores MUST be different from each other — do not give the same score to multiple issues.
+
+Scoring criteria (add or subtract points):
+- Issue directly uses the user's listed languages/skills → +20 to +30
+- Issue topic matches user's interest area → +15
+- Labels include "good first issue" or "beginner" → +10
+- Issue is documentation/typo only → -10 (too simple)
+- Issue requires skills not in the user's profile → -15 to -25
+- Issue has many comments (complex discussion) → -5
+
+Return ONLY a valid JSON array, no markdown, no extra text:
 [
   {{
     "index": 1,
-    "match_score": 92,
+    "match_score": 94,
     "difficulty": "Beginner",
     "effort": "2-4 hours",
-    "stack_alignment": "95% (Python + Pandas)",
+    "stack_alignment": "97% (direct Pandas DataFrame use)",
     "blast_radius": "Low (Isolated)",
-    "reason": "one sentence why this fits the user"
+    "reason": "Specific sentence referencing the issue title and how it uses the user's exact skills"
   }}
 ]
-Include ALL {min(len(all_issues), 12)} issues. Sort by match_score descending."""
+
+Rules:
+- match_score range is 40-99. Every issue MUST have a UNIQUE score — no two issues can share the same number.
+- blast_radius: "Low (Isolated)" = single file/function, "Medium (Module-level)" = affects a module, "High (Cross-cutting)" = touches multiple systems. Vary this based on each issue's scope.
+- reason: specific to this issue's content — never say "Matches your profile" or "Good fit".
+- Include ALL {min(len(all_issues), 12)} issues. Sort by match_score descending."""
 
     try:
         resp   = llm.invoke([HumanMessage(content=prompt)])
         raw    = resp.content.strip()
         m      = re.search(r'\[.*\]', raw, re.DOTALL)
         scores = json.loads(m.group()) if m else []
+
+        # Validate scores are actually unique — if >50% share the same value, reject
+        score_vals = [s.get("match_score") for s in scores if "match_score" in s]
+        if score_vals:
+            from collections import Counter
+            most_common_count = Counter(score_vals).most_common(1)[0][1]
+            if most_common_count > len(score_vals) * 0.5:
+                print(f"  LLM returned non-unique scores ({score_vals}) — using fallback")
+                scores = []
     except Exception as e:
         print(f"  LLM scoring error: {e}")
-        scores = [{"index": i+1, "match_score": 70, "difficulty": "Beginner",
-                   "effort": "3-5 hours", "stack_alignment": "Good match",
-                   "blast_radius": "Low", "reason": "Matches your profile"}
-                  for i in range(len(all_issues))]
+        scores = []
 
+    # ── Fallback: derive unique values from real issue data ───────────────
+    def _fallback_score(iss: dict, idx: int) -> dict:
+        labels   = [l.lower() for l in iss.get("labels", [])]
+        title    = iss.get("title", "").lower()
+        body     = iss.get("body", "").lower()
+        comments = iss.get("comments", 0)
+
+        # Base score from profile language match against issue content
+        lang_keywords = [l.strip().lower() for l in profile.get("languages", "").split(",")]
+        skill_keywords = [s.strip().lower() for s in profile.get("skills", "").split(",")]
+        interest = profile.get("interest", "").lower()
+
+        base = 60
+        for kw in lang_keywords:
+            if kw and (kw in title or kw in body):
+                base += 15
+        for kw in skill_keywords:
+            if kw and len(kw) > 2 and (kw in title or kw in body):
+                base += 8
+        if interest and any(w in title or w in body for w in interest.split()):
+            base += 10
+        if any(l in labels for l in ["good first issue", "good-first-issue", "beginner"]):
+            base += 8
+        if any(l in labels for l in ["documentation", "docs", "typo"]):
+            base -= 8
+        if comments > 15:
+            base -= 10
+        elif comments > 5:
+            base -= 4
+
+        # Ensure scores spread across issues (no two identical)
+        base = max(45, min(97, base - idx * 3))
+
+        # Blast radius from labels + title keywords
+        if any(k in title or k in body for k in ["refactor", "migration", "breaking", "api", "schema", "database", "deprecat"]):
+            blast = "High (Cross-cutting)"
+        elif any(k in title or k in body for k in ["module", "plugin", "middleware", "interface", "config", "import"]):
+            blast = "Medium (Module-level)"
+        else:
+            blast = "Low (Isolated)"
+
+        # Effort from comments and body length
+        body_len = len(iss.get("body", "") or "")
+        if comments > 10 or body_len > 800:
+            effort = "4-8 hours"
+        elif comments > 3 or body_len > 300:
+            effort = "2-4 hours"
+        else:
+            effort = "1-3 hours"
+
+        # Difficulty
+        if any(l in labels for l in ["documentation", "docs", "typo"]):
+            difficulty = "Beginner"
+        elif any(l in labels for l in ["enhancement", "feature", "performance"]):
+            difficulty = "Intermediate"
+        else:
+            difficulty = "Beginner"
+
+        # Specific reason — left empty so frontend hides it when LLM didn't provide one
+        reason = ""
+
+        return {
+            "index":           idx + 1,
+            "match_score":     base,
+            "difficulty":      difficulty,
+            "effort":          effort,
+            "stack_alignment": f"{profile.get('languages', 'Your stack').split(',')[0].strip()} applicable",
+            "blast_radius":    blast,
+            "reason":          reason,
+        }
+
+    # Fill in any missing entries from the LLM response
     score_map = {s["index"]: s for s in scores if "index" in s}
     matched = []
     for i, issue in enumerate(all_issues[:12]):
-        s = score_map.get(i + 1, {})
+        s = score_map.get(i + 1) or _fallback_score(issue, i)
+        # Reject generic reasons the LLM sometimes returns
+        reason = s.get("reason", "").strip()
+        if reason.lower() in ("matches your profile", "good fit", "n/a", ""):
+            reason = ""
         issue.update({
             "match_score":     s.get("match_score", 65),
             "difficulty":      s.get("difficulty", "Beginner"),
             "effort":          s.get("effort", "unknown"),
             "stack_alignment": s.get("stack_alignment", ""),
-            "blast_radius":    s.get("blast_radius", "Low"),
-            "reason":          s.get("reason", ""),
+            "blast_radius":    s.get("blast_radius", _fallback_score(issue, i)["blast_radius"]),
+            "reason":          reason,
         })
         matched.append(issue)
 

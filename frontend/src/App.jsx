@@ -155,7 +155,7 @@ const IssueMatchCard = ({ issue, totalCount, onPrepare, onViewOthers }) => {
             </div>
           ))}
         </div>
-        {issue.reason && (
+        {issue.reason && !['matches your profile', 'good fit'].includes(issue.reason.toLowerCase()) && (
           <p className="text-[11px] text-on-surface-variant font-code-sm italic border-t border-outline-variant/30 pt-2 mt-1">{issue.reason}</p>
         )}
       </div>

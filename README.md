@@ -23,21 +23,17 @@ OpenStep is a multi-agent AI copilot that finds the perfect first open source is
 | React | 19 |
 | Vite | 8 |
 | Tailwind CSS | 3.4 |
-| Material Symbols (Google Fonts) | — |
-| JetBrains Mono + Inter (Google Fonts) | — |
 
 ### Backend
 | Technology | Version |
 |---|---|
 | Python | 3.11+ |
 | FastAPI | 0.141 |
-| Uvicorn | 0.54 |
 | LangGraph | 1.2 |
 | LangChain | 1.4 |
 | langchain-groq | 1.1 |
-| Groq LLM (llama3-70b-8192) | — |
 | httpx | 0.28 |
-| Pydantic | 2.13 |
+
 
 ### APIs
 - **GitHub REST API** — repository search, issues, commits, file contents
@@ -177,3 +173,7 @@ The app will be available at `http://localhost:5173`.
 | `npm run build` | Build for production |
 | `npm run preview` | Preview the production build locally |
 | `npm run lint` | Run oxlint |
+
+# Team Name - Single_thread (Solo)
+# Aayush Gupta(11724210016)
+

@@ -7,8 +7,8 @@
     margin: 0;
     padding: 0;
     font-family: 'Inter', sans-serif;
-    background-color: #faf8ff;
-    color: #131b2e;
+    background-color: #f8faff;
+    color: #0f172a;
   }
   body {
     overscroll-behavior: none;
@@ -31,8 +31,8 @@
 @layer components {
   /* Text selection */
   ::selection {
-    background-color: #eaddff;
-    color: #25005a;
+    background-color: #dbeafe;
+    color: #1e3a5f;
   }
 }
 

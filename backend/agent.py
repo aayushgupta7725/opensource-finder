@@ -454,19 +454,24 @@ Rules:
         else:
             blast = "Low (Isolated)"
 
-        # Effort from comments and body length
+        # Effort from comments and body length — unique per issue
         body_len = len(iss.get("body", "") or "")
         if comments > 10 or body_len > 800:
-            effort = "4-8 hours"
-        elif comments > 3 or body_len > 300:
+            effort = "6-10 hours"
+        elif comments > 5 or body_len > 500:
+            effort = "4-6 hours"
+        elif comments > 2 or body_len > 200:
             effort = "2-4 hours"
         else:
-            effort = "1-3 hours"
+            effort = "1-2 hours"
 
-        # Difficulty
-        if any(l in labels for l in ["documentation", "docs", "typo"]):
+        # Difficulty — from labels first, then title keywords
+        if any(l in labels for l in ["documentation", "docs", "typo", "spelling"]):
             difficulty = "Beginner"
-        elif any(l in labels for l in ["enhancement", "feature", "performance"]):
+        elif any(l in labels for l in ["performance", "security", "architecture"]):
+            difficulty = "Advanced"
+        elif any(l in labels for l in ["enhancement", "feature", "improvement"]) or \
+             any(k in title for k in ["refactor", "migration", "implement", "add support"]):
             difficulty = "Intermediate"
         else:
             difficulty = "Beginner"

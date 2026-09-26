@@ -86,7 +86,10 @@ const RepoCard = ({ repo }) => {
           <span className={`text-[11px] font-code-sm flex items-center gap-0.5 ${b.cls}`}><Icon name={b.icon} size={12} />{b.label}</span>
         </div>
         <h4 className="font-code-md text-code-md font-semibold text-on-surface mt-2 truncate" title={repo.name}>{repo.name}</h4>
-        <p className="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2">{repo.description || 'No description available.'}</p>
+        {/* Short description — always shown, capped at 2 lines */}
+        <p className="font-body-sm text-body-sm text-on-surface-variant mt-1 line-clamp-2 leading-snug">
+          {repo.description || 'No description available.'}
+        </p>
       </div>
       <div className="mt-3 pt-2 bg-surface-container-low rounded-lg p-2 flex flex-col gap-1 text-[11px] font-code-sm">
         <div className="flex justify-between text-on-surface-variant">
@@ -97,9 +100,7 @@ const RepoCard = ({ repo }) => {
           <span>Stars:</span>
           <span className="font-medium">{repo.stars?.toLocaleString() ?? '—'}</span>
         </div>
-        {repo.reason && (
-          <p className="text-[10px] text-on-surface-variant italic pt-0.5 border-t border-outline-variant/30 mt-0.5">{repo.reason}</p>
-        )}
+        {/* reason line removed — it was showing generated text like "Actively maintained, has X stars" */}
       </div>
     </a>
   );
@@ -109,45 +110,39 @@ const RepoCard = ({ repo }) => {
 const IssueMatchCard = ({ issue, totalCount, onPrepare, onViewOthers }) => {
   return (
     <div className="bg-surface-container-lowest p-space-md rounded-xl shadow-md flex flex-col gap-space-md">
-      {/* Header row */}
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <div className="flex items-center gap-2 flex-wrap mb-1">
-            <span className="px-2 py-0.5 rounded-full bg-primary-container text-on-primary font-code-sm text-code-sm font-semibold flex items-center gap-1">
-              <Icon name="stars" size={13} /> {issue.match_score}% Match · Top Pick
-            </span>
-            <span className="px-2 py-0.5 rounded-full bg-surface-container-low text-primary font-code-sm text-code-sm">{issue.issue_id}</span>
-            {issue.labels?.slice(0, 2).map(l => (
-              <span key={l} className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">{l}</span>
-            ))}
-          </div>
-          <h3 className="font-headline-md text-headline-md text-on-surface font-semibold leading-snug">{issue.title}</h3>
-          <a
-            href={`https://github.com/${issue.repo}`}
-            target="_blank"
-            rel="noreferrer"
-            className="font-code-sm text-code-sm text-on-surface-variant hover:text-primary transition-colors"
-          >
-            {issue.repo}
-          </a>
+      {/* Header row — badges + title + repo only, no difficulty here */}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="px-2 py-0.5 rounded-full bg-primary-container text-on-primary font-code-sm text-code-sm font-semibold flex items-center gap-1">
+            <Icon name="stars" size={13} /> {issue.match_score}% Match · Top Pick
+          </span>
+          <span className="px-2 py-0.5 rounded-full bg-surface-container-low text-primary font-code-sm text-code-sm">{issue.issue_id}</span>
+          {issue.labels?.slice(0, 2).map(l => (
+            <span key={l} className="px-2 py-0.5 rounded-full bg-surface-container-high text-on-surface-variant font-code-sm text-code-sm">{l}</span>
+          ))}
         </div>
-        <div className="text-right flex flex-col items-end flex-shrink-0">
-          <span className="text-[11px] font-code-sm text-outline">Difficulty</span>
-          <span className="font-code-sm text-code-sm text-on-surface font-semibold">{issue.difficulty}</span>
-        </div>
+        <h3 className="font-headline-md text-headline-md text-on-surface font-semibold leading-snug">{issue.title}</h3>
+        <a
+          href={`https://github.com/${issue.repo}`}
+          target="_blank"
+          rel="noreferrer"
+          className="font-code-sm text-code-sm text-on-surface-variant hover:text-primary transition-colors"
+        >
+          {issue.repo}
+        </a>
       </div>
 
-      {/* Agent Fit Breakdown */}
+      {/* Agent Fit Breakdown — 4 columns, each with a unique value */}
       <div className="bg-surface-container-low rounded-xl p-space-md flex flex-col gap-2">
         <span className="text-label-md font-label-md text-primary font-semibold flex items-center gap-1">
           <Icon name="verified_user" size={16} /> Agent Fit Breakdown
         </span>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-space-sm pt-1">
           {[
-            ['Stack Alignment', issue.stack_alignment || '—', 'text-primary'],
-            ['Est. Effort',     issue.effort || '—',          'text-on-surface'],
-            ['Scope Size',      issue.difficulty || '—',      'text-on-surface'],
-            ['Blast Radius',    issue.blast_radius || 'Low',  'text-tertiary-container'],
+            ['Stack Alignment', issue.stack_alignment || '—',  'text-primary'],
+            ['Est. Effort',     issue.effort          || '—',  'text-on-surface'],
+            ['Difficulty',      issue.difficulty      || '—',  'text-on-surface'],
+            ['Blast Radius',    issue.blast_radius    || '—',  'text-tertiary-container'],
           ].map(([k, v, cls]) => (
             <div key={k} className="flex flex-col">
               <span className="text-[11px] text-on-surface-variant font-code-sm">{k}</span>

@@ -200,6 +200,14 @@ const OnboardingBrief = ({ issue }) => {
   const targetFiles  = brief.target_files  || [];
   const introComment = brief.intro_comment || `Hi! I'd love to work on this issue. Could you please assign it to me?`;
   const implHint     = brief.implementation_hint || '';
+  const prKeywords   = brief.pr_search_keywords || issue?.title?.split(' ').slice(0, 4).join(' ') || '';
+  // GitHub search URL for merged PRs similar to this issue
+  const prSearchUrl  = `https://github.com/${repoName}/pulls?q=is%3Apr+is%3Amerged+${encodeURIComponent(prKeywords)}`;
+  // Build GitHub file URLs — try main branch, fall back to repo root if path looks generic
+  const fileUrl = (path) => {
+    if (!path || path === 'See issue description') return repoUrl;
+    return `https://github.com/${repoName}/blob/main/${path}`;
+  };
 
   return (
     <div className="bg-surface-container-lowest p-space-md lg:p-space-lg rounded-2xl rounded-tl-none shadow-md w-full flex flex-col gap-space-lg">
@@ -289,47 +297,67 @@ const OnboardingBrief = ({ issue }) => {
         {/* ── Row 2: Target Files · Prior PR Reference ── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-space-md">
 
-          {/* 4. Target Files */}
+          {/* 4. Target Files Map */}
           <div className="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-on-surface font-semibold font-label-md text-label-md">
                 <Icon name="folder_open" size={18} className="text-primary" />
                 <span>4. Target Files Map</span>
               </div>
-              <span className="font-code-sm text-[11px] text-primary font-medium">{targetFiles.length || '—'} file(s)</span>
+              <span className="font-code-sm text-[11px] text-primary font-medium">
+                {targetFiles.length ? `${targetFiles.length} File${targetFiles.length > 1 ? 's' : ''} Only` : '—'}
+              </span>
             </div>
             <div className="space-y-2 pt-1 font-code-sm text-code-sm">
-              {(targetFiles.length ? targetFiles : [{ path: 'See issue description', note: '' }]).map((f, i) => (
-                <div key={i} className="p-2 rounded bg-surface-container-lowest flex items-center justify-between gap-2">
+              {(targetFiles.length ? targetFiles : [{ path: 'See issue description', line_range: '' }]).map((f, i) => (
+                <a
+                  key={i}
+                  href={f.path && f.path !== 'See issue description'
+                    ? `https://github.com/${repoName}/blob/main/${f.path}`
+                    : repoUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="p-2 rounded bg-surface-container-lowest flex items-center justify-between gap-2 hover:bg-surface-container-high transition-colors no-underline group"
+                >
                   <div className="flex items-center gap-1.5 truncate">
                     <Icon name={i === 0 ? 'edit_document' : 'science'} size={14} className={i === 0 ? 'text-primary' : 'text-tertiary-container'} />
-                    <span className="truncate text-on-surface">{f.path}</span>
+                    <span className="truncate text-on-surface group-hover:text-primary group-hover:underline transition-colors">{f.path}</span>
                   </div>
-                  {f.note && <span className="text-on-surface-variant text-[10px] flex-shrink-0">{f.note}</span>}
-                </div>
+                  {f.line_range && (
+                    <span className="text-secondary font-semibold text-[11px] flex-shrink-0">{f.line_range}</span>
+                  )}
+                </a>
               ))}
             </div>
           </div>
 
-          {/* 5. Prior PR / Implementation Reference */}
+          {/* 5. Canonical Prior PR Reference */}
           <div className="bg-surface-container-low p-space-md rounded-xl flex flex-col gap-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-on-surface font-semibold font-label-md text-label-md">
                 <Icon name="history_edu" size={18} className="text-secondary" />
-                <span>5. Implementation Reference</span>
+                <span>5. Canonical Prior PR Reference</span>
               </div>
+              {brief.prior_pr?.number && (
+                <span className="px-1.5 py-0.5 rounded bg-surface-container text-secondary font-code-sm text-[11px]">
+                  {brief.prior_pr.number}
+                </span>
+              )}
             </div>
             <p className="font-body-sm text-body-sm text-on-surface-variant leading-relaxed">
-              {implHint || `Follow the existing patterns in the ${repoName} codebase. Look for similar methods or classes to use as a blueprint for your implementation.`}
+              {brief.prior_pr?.number
+                ? <>Use {brief.prior_pr.number} (<em className="text-on-surface font-medium">"{brief.prior_pr.title}"</em>) as your direct code blueprint. {brief.prior_pr.description}</>
+                : implHint || `Follow the existing patterns in the ${repoName} codebase. Look for similar merged PRs to use as a blueprint.`
+              }
             </p>
             <div className="mt-auto pt-1 flex items-center gap-2">
               <a
-                href={repoUrl}
+                href={prSearchUrl}
                 target="_blank"
                 rel="noreferrer"
                 className="font-code-sm text-code-sm text-primary hover:underline flex items-center gap-1"
               >
-                Browse repository <Icon name="arrow_outward" size={13} />
+                Inspect PR diff tree <Icon name="arrow_outward" size={13} />
               </a>
             </div>
           </div>

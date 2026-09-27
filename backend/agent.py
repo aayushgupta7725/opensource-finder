@@ -531,9 +531,12 @@ def onboarding_agent(state: AgentState) -> dict:
 
     final_recs = []
     for issue in issues:
-        repo_name = issue["repo"]
-        readme_text = contributing_text = ""
+        repo_name  = issue["repo"]
+        repo_url   = issue.get("repo_url", f"https://github.com/{repo_name}")
+        repo_short = repo_name.split("/")[-1]
 
+        # ── Fetch README and CONTRIBUTING for context ─────────────────────
+        readme_text = contributing_text = ""
         for fname in ["README.md", "readme.md"]:
             try:
                 data = gh_get(f"https://api.github.com/repos/{repo_name}/contents/{fname}")
@@ -550,8 +553,39 @@ def onboarding_agent(state: AgentState) -> dict:
             except Exception:
                 pass
 
-        repo_url = issue.get("repo_url", f"https://github.com/{repo_name}")
-        repo_short = repo_name.split("/")[-1]
+        # ── Fetch real file tree from GitHub (up to 300 files) ────────────
+        # Uses the git trees API with recursive=1 to get all paths at once
+        real_file_paths = []
+        try:
+            # Get default branch first
+            repo_meta = gh_get(f"https://api.github.com/repos/{repo_name}")
+            default_branch = repo_meta.get("default_branch", "main")
+            tree_data = gh_get(
+                f"https://api.github.com/repos/{repo_name}/git/trees/{default_branch}",
+                params={"recursive": "1"},
+            )
+            all_paths = [
+                item["path"] for item in tree_data.get("tree", [])
+                if item.get("type") == "blob"
+                and not item["path"].startswith(".")
+                and not any(skip in item["path"] for skip in [
+                    "node_modules/", "__pycache__/", ".git/", "dist/",
+                    "build/", ".egg-info/", "vendor/", "venv/"
+                ])
+            ]
+            # Filter to code + test files only, cap at 200
+            real_file_paths = [
+                p for p in all_paths
+                if p.endswith((
+                    ".py", ".js", ".ts", ".jsx", ".tsx", ".go", ".rs",
+                    ".java", ".rb", ".cs", ".cpp", ".c", ".h", ".md"
+                ))
+            ][:200]
+            print(f"  → {len(real_file_paths)} real file paths fetched")
+        except Exception as e:
+            print(f"  File tree fetch failed for {repo_name}: {e}")
+
+        file_list_for_prompt = "\n".join(real_file_paths[:150]) if real_file_paths else "File tree not available"
 
         prompt = f"""You are an expert open-source contribution guide generator.
 
@@ -574,6 +608,9 @@ Repository context:
 README (excerpt): {readme_text[:800] or 'Not available'}
 CONTRIBUTING (excerpt): {contributing_text[:600] or 'Not available'}
 
+REAL FILE TREE (actual paths from this repository):
+{file_list_for_prompt}
+
 Return ONLY valid JSON (no markdown fences, no extra text):
 {{
   "deliverable": "one sentence describing exactly what code change is needed",
@@ -582,17 +619,25 @@ Return ONLY valid JSON (no markdown fences, no extra text):
   "test_lines": "e.g. ~20 lines",
   "prerequisites": ["skill or tool 1", "skill or tool 2", "skill or tool 3"],
   "target_files": [
-    {{"path": "path/to/file.py", "note": "what to change"}},
-    {{"path": "tests/test_file.py", "note": "add tests"}}
+    {{"path": "exact/path/from/file_tree.py", "line_range": "e.g. lines 120-155 or Add new function"}},
+    {{"path": "tests/test_file.py", "line_range": "Add test_xyz()"}}
   ],
+  "prior_pr": {{
+    "number": "PR #1234",
+    "title": "Short title of a similar merged PR in this repo",
+    "description": "One sentence on how this prior PR is a blueprint for the current task"
+  }},
   "setup_commands": [
     "git clone {repo_url}",
     "cd {repo_short}",
     "pip install -e ."
   ],
   "intro_comment": "a ready-to-send GitHub comment to the maintainer expressing interest",
-  "implementation_hint": "2-3 sentences on how to approach the implementation"
-}}"""
+  "implementation_hint": "2-3 sentences on how to approach the implementation",
+  "pr_search_keywords": "2-4 keywords from the issue title to search for similar merged PRs"
+}}
+
+IMPORTANT: target_files MUST use EXACT paths from the REAL FILE TREE above — do not invent paths."""
 
         try:
             resp  = llm.invoke([HumanMessage(content=prompt)])
